@@ -10,10 +10,17 @@ class ResourceLoader {
     loadImage(name, src) {
         return new Promise((resolve) => {
             const img = new Image();
+            img.crossOrigin = 'anonymous'; // 尝试允许跨域
             img.onload = async () => {
-                // 对sprite图片进行白边清理
+                // 对sprite图片进行白边清理（仅在非跨域环境）
                 if (['hero', 'enemy', 'weapon', 'chest', 'exp_orb'].includes(name)) {
-                    this.images[name] = await this.removeWhiteEdges(img);
+                    try {
+                        this.images[name] = await this.removeWhiteEdges(img);
+                    } catch (e) {
+                        // 跨域失败时使用原图
+                        console.log(`跨域限制，跳过白边处理: ${name}`);
+                        this.images[name] = img;
+                    }
                 } else {
                     this.images[name] = img;
                 }
@@ -21,7 +28,7 @@ class ResourceLoader {
                 resolve(true);
             };
             img.onerror = () => {
-                console.warn(`Failed to load image: ${name}`);
+                console.warn(`图片加载失败: ${name}`);
                 this.loaded++;
                 resolve(false);
             };
@@ -167,19 +174,52 @@ class AudioManager {
     load(name, src) {
         return new Promise((resolve) => {
             try {
-                const audio = new Audio(src);
+                const audio = new Audio();
                 audio.volume = this.getVolume(name);
-                audio.oncanplaythrough = () => {
-                    this.sounds[name] = audio;
-                    resolve(true);
+                audio.preload = 'auto';
+
+                // 监听多个事件以确保加载
+                let loaded = false;
+                const onSuccess = () => {
+                    if (!loaded) {
+                        loaded = true;
+                        this.sounds[name] = audio;
+                        console.log(`音频加载成功: ${name}`);
+                        resolve(true);
+                    }
                 };
-                audio.onerror = () => {
-                    console.warn(`Failed to load sound: ${name}`);
-                    resolve(false);
+
+                const onError = (e) => {
+                    if (!loaded) {
+                        loaded = true;
+                        console.warn(`音频加载失败: ${name}`, e);
+                        resolve(false);
+                    }
                 };
+
+                audio.addEventListener('canplaythrough', onSuccess, { once: true });
+                audio.addEventListener('loadeddata', onSuccess, { once: true });
+                audio.addEventListener('error', onError, { once: true });
+
+                // 设置超时，防止一直等待
+                setTimeout(() => {
+                    if (!loaded) {
+                        loaded = true;
+                        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
+                            this.sounds[name] = audio;
+                            console.log(`音频加载成功(超时后): ${name}`);
+                            resolve(true);
+                        } else {
+                            console.warn(`音频加载超时: ${name}`);
+                            resolve(false);
+                        }
+                    }
+                }, 3000);
+
+                audio.src = src;
                 audio.load();
             } catch (e) {
-                console.warn(`Failed to load sound: ${name}`);
+                console.warn(`音频加载异常: ${name}`, e);
                 resolve(false);
             }
         });

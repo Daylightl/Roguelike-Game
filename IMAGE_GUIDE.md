@@ -194,7 +194,30 @@ transparent background
 - 使用无损PNG格式
 - 避免使用JPG格式（会有压缩失真）
 
-### 问题3: 加载缓慢
+### 问题3: 图片有白边
+
+**原因:**
+- AI生成的PNG图片可能带有白色/浅色半透明像素
+- PNG导出设置不当导致边缘有背景色残留
+
+**解决方案:**
+1. **重新生成图片时**，在AI工具中明确要求：
+   - "transparent background"（透明背景）
+   - "no white edges"（无白边）
+   - "clean alpha channel"（干净的透明通道）
+
+2. **使用图片处理工具**：
+   - Photoshop: 删除白色杂边 (Layer > Matting > Remove White Matte)
+   - GIMP: 使用"Color to Alpha"功能移除白色
+   - 在线工具: remove.bg 或 PhotoScissors
+
+3. **提示词优化**：
+   ```
+   transparent background, NO white edges, clean cutout,
+   perfect alpha channel, game sprite, PNG with transparency
+   ```
+
+### 问题4: 加载缓慢
 
 **优化建议:**
 - 压缩图片文件大小（保持质量）

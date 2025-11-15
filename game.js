@@ -10,8 +10,13 @@ class ResourceLoader {
     loadImage(name, src) {
         return new Promise((resolve) => {
             const img = new Image();
-            img.onload = () => {
-                this.images[name] = img;
+            img.onload = async () => {
+                // 对sprite图片进行白边清理
+                if (['hero', 'enemy', 'weapon', 'chest', 'exp_orb'].includes(name)) {
+                    this.images[name] = await this.removeWhiteEdges(img);
+                } else {
+                    this.images[name] = img;
+                }
                 this.loaded++;
                 resolve(true);
             };
@@ -21,6 +26,51 @@ class ResourceLoader {
                 resolve(false);
             };
             img.src = src;
+        });
+    }
+
+    // 移除图片白边（处理AI生成PNG的半透明白色像素）
+    removeWhiteEdges(img) {
+        return new Promise((resolve) => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+
+                // 遍历所有像素
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const a = data[i + 3];
+
+                    // 如果是白色或接近白色的半透明像素，将其变为完全透明
+                    if (a < 255 && r > 200 && g > 200 && b > 200) {
+                        data[i + 3] = 0; // 设为完全透明
+                    }
+
+                    // 增强边缘透明度，去除灰白色杂边
+                    if (a > 0 && a < 100 && r > 180 && g > 180 && b > 180) {
+                        data[i + 3] = 0;
+                    }
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+
+                // 创建新图片对象
+                const processedImg = new Image();
+                processedImg.onload = () => resolve(processedImg);
+                processedImg.onerror = () => resolve(img); // 失败时使用原图
+                processedImg.src = canvas.toDataURL();
+            } catch (e) {
+                console.warn('图片白边处理失败，使用原图:', e);
+                resolve(img);
+            }
         });
     }
 
@@ -1355,6 +1405,10 @@ class Game {
         const ctx = this.ctx;
         const backgroundImg = Resources.getImage('background');
 
+        // 设置Canvas渲染质量
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
         // 绘制背景
         if (backgroundImg && Resources.useImages) {
             // 使用背景图片
@@ -1448,16 +1502,19 @@ window.addEventListener('load', async () => {
     // 启动游戏
     game = new Game();
 
-    // 解锁并播放音频（需要用户交互才能播放）
-    const unlockAudio = () => {
+    // 尝试自动播放背景音乐
+    Audio.playLoop('bgm');
+
+    // 如果自动播放失败，在用户交互时播放
+    const ensureAudio = () => {
         Audio.unlock();
-        Audio.playLoop('bgm');
+        if (!Audio.sounds.bgm || Audio.sounds.bgm.paused) {
+            Audio.playLoop('bgm');
+        }
     };
 
-    // 监听多种用户交互事件
-    document.addEventListener('click', unlockAudio, { once: true });
-    document.addEventListener('keydown', unlockAudio, { once: true });
-    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', ensureAudio, { once: true });
+    document.addEventListener('keydown', ensureAudio, { once: true });
 });
 
 function showLoadingScreen() {

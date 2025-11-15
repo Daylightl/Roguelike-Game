@@ -205,10 +205,10 @@ class Player {
         this.vy = 0;
 
         // 键盘移动
-        if (keys['w'] || keys['ArrowUp']) this.vy = -1;
-        if (keys['s'] || keys['ArrowDown']) this.vy = 1;
-        if (keys['a'] || keys['ArrowLeft']) this.vx = -1;
-        if (keys['d'] || keys['ArrowRight']) this.vx = 1;
+        if (keys['w'] || keys['arrowup']) this.vy = -1;
+        if (keys['s'] || keys['arrowdown']) this.vy = 1;
+        if (keys['a'] || keys['arrowleft']) this.vx = -1;
+        if (keys['d'] || keys['arrowright']) this.vx = 1;
 
         // 鼠标移动
         if (this.targetX !== null && this.targetY !== null) {
@@ -819,7 +819,6 @@ class Game {
         });
 
         window.addEventListener('keyup', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
             delete this.keys[e.key.toLowerCase()];
         });
 

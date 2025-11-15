@@ -97,6 +97,7 @@ class AudioManager {
     constructor() {
         this.sounds = {};
         this.enabled = true; // 启用音效
+        this.unlocked = false; // 是否已解锁音频播放（浏览器自动播放策略）
     }
 
     async loadAll() {
@@ -175,6 +176,24 @@ class AudioManager {
             this.sounds[name].pause();
             this.sounds[name].currentTime = 0;
         }
+    }
+
+    // 解锁音频播放（需要用户交互）
+    unlock() {
+        if (this.unlocked) return;
+
+        // 尝试播放所有音频以解锁
+        Object.values(this.sounds).forEach(sound => {
+            if (sound) {
+                sound.play().then(() => {
+                    sound.pause();
+                    sound.currentTime = 0;
+                }).catch(() => {});
+            }
+        });
+
+        this.unlocked = true;
+        console.log('音频已解锁');
     }
 }
 
@@ -358,12 +377,16 @@ class Player {
             }
 
             const srcX = frame * frameWidth;
-            const drawSize = this.radius * 3;
+
+            // 保持宽高比，避免压缩变形
+            const aspectRatio = frameWidth / frameHeight; // 约 0.33 (1:3)
+            const drawHeight = this.radius * 3.5;
+            const drawWidth = drawHeight * aspectRatio;
 
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.drawImage(heroImg, srcX, 0, frameWidth, frameHeight,
-                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                         -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
             ctx.restore();
         } else {
             // 降级为纯色绘制
@@ -424,7 +447,7 @@ class Player {
             // 武器本体
             ctx.save();
             ctx.translate(pos.x, pos.y);
-            ctx.rotate(pos.angle);
+            ctx.rotate(pos.angle + Math.PI); // 旋转180度，让剑柄朝向人物
 
             if (weaponImg && Resources.useImages) {
                 // 1024×1024画布，5个武器横向排列
@@ -433,9 +456,13 @@ class Player {
                 const weaponIndex = this.weaponType % 5;
                 const srcX = weaponIndex * weaponWidth;
 
-                const drawSize = 30;
+                // 保持宽高比，避免压缩变形
+                const aspectRatio = weaponWidth / weaponHeight; // 约 0.2 (1:5)
+                const drawHeight = 35;
+                const drawWidth = drawHeight * aspectRatio;
+
                 ctx.drawImage(weaponImg, srcX, 0, weaponWidth, weaponHeight,
-                             -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                             -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
             } else {
                 // 降级为纯色三角形
                 ctx.fillStyle = color;
@@ -546,12 +573,16 @@ class Enemy {
             };
 
             const sprite = spriteInfo[this.type];
-            const drawSize = this.radius * 2.5; // 绘制尺寸稍大于碰撞半径
+
+            // 保持宽高比，避免压缩变形
+            const aspectRatio = sprite.srcW / sprite.srcH; // 约 3:1
+            const drawHeight = this.radius * 2.5;
+            const drawWidth = drawHeight * aspectRatio;
 
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.drawImage(enemyImg, sprite.srcX, sprite.srcY, sprite.srcW, sprite.srcH,
-                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                         -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
             ctx.restore();
         } else {
             // 降级为纯色绘制
@@ -754,12 +785,15 @@ class Chest {
             const frame = this.isOpen ? 1 : 0; // 0=关闭, 1=打开
             const srcX = frame * frameWidth;
 
-            const drawSize = this.radius * 2;
+            // 保持宽高比，避免压缩变形
+            const aspectRatio = frameWidth / frameHeight; // 0.5 (1:2)
+            const drawHeight = this.radius * 2.2;
+            const drawWidth = drawHeight * aspectRatio;
 
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.drawImage(chestImg, srcX, 0, frameWidth, frameHeight,
-                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                         -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
             ctx.restore();
         } else {
             // 降级为矩形绘制
@@ -1414,10 +1448,16 @@ window.addEventListener('load', async () => {
     // 启动游戏
     game = new Game();
 
-    // 播放背景音乐（需要用户交互才能播放）
-    document.addEventListener('click', () => {
+    // 解锁并播放音频（需要用户交互才能播放）
+    const unlockAudio = () => {
+        Audio.unlock();
         Audio.playLoop('bgm');
-    }, { once: true });
+    };
+
+    // 监听多种用户交互事件
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
 });
 
 function showLoadingScreen() {

@@ -549,7 +549,7 @@ class Player {
 
                 // 保持宽高比，避免压缩变形
                 const aspectRatio = weaponWidth / weaponHeight; // 约 0.2 (1:5)
-                const drawHeight = 35;
+                const drawHeight = 60; // 增加武器尺寸：从35改为60
                 const drawWidth = drawHeight * aspectRatio;
 
                 ctx.drawImage(weaponImg, srcX, 0, weaponWidth, weaponHeight,

@@ -14,9 +14,32 @@
 
 ## 快速开始
 
-### 在线游玩
+### 方式一：使用本地服务器（推荐）⭐
 
-直接用浏览器打开 `index.html` 文件即可开始游戏。
+为了确保音频和图片正常加载，建议使用本地HTTP服务器运行游戏：
+
+**Python 3:**
+```bash
+cd Roguelike-Game
+python -m http.server 8000
+```
+
+**Node.js:**
+```bash
+cd Roguelike-Game
+npx http-server -p 8000
+```
+
+**VS Code:**
+安装 "Live Server" 插件，右键 `index.html` 选择 "Open with Live Server"
+
+然后在浏览器访问：`http://localhost:8000`
+
+### 方式二：直接打开（可能有限制）
+
+直接双击 `index.html` 文件也可以运行，但可能会遇到：
+- ⚠️ 音频无法播放（浏览器跨域限制）
+- ⚠️ 部分功能受限
 
 ### 推荐浏览器
 

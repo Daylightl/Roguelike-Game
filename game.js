@@ -174,7 +174,8 @@ class AudioManager {
     load(name, src) {
         return new Promise((resolve) => {
             try {
-                const audio = new Audio();
+                // 使用 window.Audio 避免与全局 Audio 变量冲突
+                const audio = new window.Audio();
                 audio.volume = this.getVolume(name);
                 audio.preload = 'auto';
 

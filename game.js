@@ -345,9 +345,9 @@ class Player {
 
         const heroImg = Resources.getImage('hero');
         if (heroImg && Resources.useImages) {
-            // 使用sprite图绘制 - 120×50px, 3帧横向排列，每帧40×50px
-            const frameWidth = 40;
-            const frameHeight = 50;
+            // 1024×1024画布，3个角色横向排列
+            const frameWidth = 1024 / 3; // 每帧约341px
+            const frameHeight = 1024;
             let frame = 0; // 默认待机帧
 
             // 根据状态选择帧
@@ -358,7 +358,7 @@ class Player {
             }
 
             const srcX = frame * frameWidth;
-            const drawSize = this.radius * 2.5; // 稍微放大以匹配原比例
+            const drawSize = this.radius * 3;
 
             ctx.save();
             ctx.translate(this.x, this.y);
@@ -400,13 +400,14 @@ class Player {
         const trailImg = Resources.getImage('trail');
 
         positions.forEach(pos => {
-            // 拖尾效果 - 50×5px
+            // 拖尾效果
             if (trailImg && Resources.useImages) {
                 ctx.save();
-                ctx.globalAlpha = 0.5;
+                ctx.globalAlpha = 0.3;
                 ctx.translate(pos.x, pos.y);
                 ctx.rotate(pos.angle);
-                ctx.drawImage(trailImg, -50, -2.5, 50, 5);
+                const trailSize = 40;
+                ctx.drawImage(trailImg, -trailSize, -trailSize / 4, trailSize, trailSize / 2);
                 ctx.restore();
                 ctx.globalAlpha = 1.0;
             } else {
@@ -426,13 +427,13 @@ class Player {
             ctx.rotate(pos.angle);
 
             if (weaponImg && Resources.useImages) {
-                // 使用sprite图绘制武器 - 150×50px, 横向5种，每个30×50px
-                const weaponWidth = 30;
-                const weaponHeight = 50;
+                // 1024×1024画布，5个武器横向排列
+                const weaponWidth = 1024 / 5; // 每个约205px
+                const weaponHeight = 1024;
                 const weaponIndex = this.weaponType % 5;
                 const srcX = weaponIndex * weaponWidth;
 
-                const drawSize = 25; // 绘制尺寸
+                const drawSize = 30;
                 ctx.drawImage(weaponImg, srcX, 0, weaponWidth, weaponHeight,
                              -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             } else {
@@ -536,16 +537,16 @@ class Enemy {
         const enemyImg = Resources.getImage('enemy');
 
         if (enemyImg && Resources.useImages) {
-            // 使用sprite图绘制敌人 - 100×360px, 纵向3个
-            // 小兵: 0-100px (100×100), 精英: 100-220px (100×120), BOSS: 220-360px (100×140)
+            // 1024×1024画布，3个敌人纵向排列
+            const frameHeight = 1024 / 3; // 每个约341px
             const spriteInfo = {
-                'minion': { srcX: 0, srcY: 0, srcW: 100, srcH: 100 },
-                'elite': { srcX: 0, srcY: 100, srcW: 100, srcH: 120 },
-                'boss': { srcX: 0, srcY: 220, srcW: 100, srcH: 140 }
+                'minion': { srcX: 0, srcY: 0, srcW: 1024, srcH: frameHeight },
+                'elite': { srcX: 0, srcY: frameHeight, srcW: 1024, srcH: frameHeight },
+                'boss': { srcX: 0, srcY: frameHeight * 2, srcW: 1024, srcH: frameHeight }
             };
 
             const sprite = spriteInfo[this.type];
-            const drawSize = this.radius * 2.2; // 绘制尺寸稍大于碰撞半径
+            const drawSize = this.radius * 2.5; // 绘制尺寸稍大于碰撞半径
 
             ctx.save();
             ctx.translate(this.x, this.y);
@@ -747,9 +748,9 @@ class Chest {
         ctx.fill();
 
         if (chestImg && Resources.useImages) {
-            // 使用sprite图绘制宝箱 - 80×40px, 横向2帧，每帧40×40px
-            const frameWidth = 40;
-            const frameHeight = 40;
+            // 1024×1024画布，2个宝箱横向排列
+            const frameWidth = 1024 / 2; // 每帧512px
+            const frameHeight = 1024;
             const frame = this.isOpen ? 1 : 0; // 0=关闭, 1=打开
             const srcX = frame * frameWidth;
 

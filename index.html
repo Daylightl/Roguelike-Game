@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鸠摩智转刀</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 1200px;
+            height: 800px;
+            background: linear-gradient(135deg, #7EC850 0%, #4A9B2E 100%);
+            border-radius: 10px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .hud {
+            pointer-events: none;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hp-bar-container {
+            width: 200px;
+        }
+
+        .bar-bg {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            height: 25px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .hp-fill {
+            background: linear-gradient(90deg, #ff4444 0%, #cc0000 100%);
+        }
+
+        .exp-fill {
+            background: linear-gradient(90deg, #4488ff 0%, #0044cc 100%);
+        }
+
+        .bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .level-exp {
+            text-align: center;
+        }
+
+        .level-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 5px;
+        }
+
+        .exp-bar-container {
+            width: 300px;
+        }
+
+        .power-display {
+            text-align: right;
+        }
+
+        .power-icon {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+            line-height: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .power-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .bottom-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .stat-item {
+            font-weight: bold;
+        }
+
+        .score-text {
+            color: #FFD700;
+            font-size: 16px;
+        }
+
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            pointer-events: all;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #2C3E50;
+            border: 5px solid #FFD700;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 600px;
+            text-align: center;
+            color: white;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 20px;
+        }
+
+        .skill-selection {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .skill-card {
+            width: 160px;
+            background: #34495e;
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .skill-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            border-color: #FFA500;
+        }
+
+        .skill-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 10px;
+        }
+
+        .skill-desc {
+            font-size: 12px;
+            color: #ecf0f1;
+            line-height: 1.4;
+        }
+
+        .skill-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-bottom: 5px;
+        }
+
+        .type-attack {
+            background: #e74c3c;
+        }
+
+        .type-defense {
+            background: #3498db;
+        }
+
+        .type-utility {
+            background: #2ecc71;
+        }
+
+        .button {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2C3E50;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .button-secondary {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            color: white;
+        }
+
+        .countdown {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .game-message {
+            font-size: 18px;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+
+        .stats-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .stat-line {
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .welcome-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px 50px;
+            border: 3px solid #FFD700;
+            border-radius: 10px;
+            font-size: 20px;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .welcome-message.show {
+            opacity: 1;
+        }
+
+        .control-hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .control-hint.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+
+        <div class="ui-overlay">
+            <!-- Top HUD -->
+            <div class="top-bar hud">
+                <!-- HP Bar -->
+                <div class="hp-bar-container">
+                    <div class="bar-bg">
+                        <div class="bar-fill hp-fill" id="hpBar" style="width: 100%;"></div>
+                        <div class="bar-text" id="hpText">HP: 100/100</div>
+                    </div>
+                </div>
+
+                <!-- Level & Exp -->
+                <div class="level-exp">
+                    <div class="level-text" id="levelText">Lv.1</div>
+                    <div class="exp-bar-container">
+                        <div class="bar-bg">
+                            <div class="bar-fill exp-fill" id="expBar" style="width: 0%;"></div>
+                            <div class="bar-text" id="expText">0/100</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Power -->
+                <div class="power-display">
+                    <span class="power-icon">⚔</span>
+                    <span class="power-text" id="powerText">战力: 100</span>
+                </div>
+            </div>
+
+            <!-- Bottom Stats -->
+            <div class="bottom-bar hud">
+                <div class="stat-item" id="killText">击杀: 0</div>
+                <div class="stat-item" id="timeText">时间: 00:00</div>
+                <div class="stat-item score-text" id="scoreText">得分: 0</div>
+            </div>
+
+            <!-- Welcome Message -->
+            <div class="welcome-message" id="welcomeMsg">
+                欢迎来到鸠摩智转刀！<br>活下去并击败BOSS！
+            </div>
+
+            <!-- Control Hint -->
+            <div class="control-hint" id="controlHint">
+                按WASD/方向键移动，空格吸收经验球
+            </div>
+        </div>
+
+        <!-- Skill Selection Modal -->
+        <div class="modal" id="skillModal">
+            <div class="modal-content">
+                <div class="modal-title">选择升级技能</div>
+                <div class="skill-selection" id="skillSelection"></div>
+                <div class="countdown" id="skillCountdown"></div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div class="modal" id="gameOverModal">
+            <div class="modal-content">
+                <div class="modal-title" id="gameOverTitle">游戏结束</div>
+                <div class="game-message" id="gameOverMessage"></div>
+                <div class="stats-display" id="finalStats"></div>
+                <button class="button" onclick="game.restart()">重新开始</button>
+            </div>
+        </div>
+
+        <!-- Boss Warning Modal -->
+        <div class="modal" id="bossModal">
+            <div class="modal-content">
+                <div class="modal-title">BOSS出现了！</div>
+                <div class="game-message">击败它获得胜利！</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

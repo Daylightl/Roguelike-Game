@@ -471,7 +471,7 @@ class Player {
 
             // 保持宽高比，避免压缩变形
             const aspectRatio = frameWidth / frameHeight; // 约 0.33 (1:3)
-            const drawHeight = this.radius * 3.5;
+            const drawHeight = this.radius * 6; // 增加人物尺寸：从3.5改为6
             const drawWidth = drawHeight * aspectRatio;
 
             ctx.save();
@@ -538,7 +538,7 @@ class Player {
             // 武器本体
             ctx.save();
             ctx.translate(pos.x, pos.y);
-            ctx.rotate(pos.angle + Math.PI); // 旋转180度，让剑柄朝向人物
+            ctx.rotate(pos.angle + Math.PI / 2); // 旋转90度，让武器垂直于人物方向
 
             if (weaponImg && Resources.useImages) {
                 // 1024×1024画布，5个武器横向排列

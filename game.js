@@ -1,3 +1,65 @@
+// ==================== 资源加载器 ====================
+class ResourceLoader {
+    constructor() {
+        this.images = {};
+        this.loaded = 0;
+        this.total = 0;
+        this.useImages = true; // 是否使用图片（如果加载失败则降级为纯色）
+    }
+
+    loadImage(name, src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                this.images[name] = img;
+                this.loaded++;
+                resolve(true);
+            };
+            img.onerror = () => {
+                console.warn(`Failed to load image: ${name}`);
+                this.loaded++;
+                resolve(false);
+            };
+            img.src = src;
+        });
+    }
+
+    async loadAll() {
+        const imagesToLoad = [
+            { name: 'background', src: 'assets/images/background.png' },
+            { name: 'hero', src: 'assets/images/hero.png' },
+            { name: 'enemy', src: 'assets/images/enemy.png' },
+            { name: 'weapon', src: 'assets/images/weapon.png' },
+            { name: 'exp_orb', src: 'assets/images/exp_orb.png' },
+            { name: 'chest', src: 'assets/images/chest.png' },
+            { name: 'trail', src: 'assets/images/trail.png' },
+            { name: 'warning', src: 'assets/images/warning.png' }
+        ];
+
+        this.total = imagesToLoad.length;
+        const promises = imagesToLoad.map(img => this.loadImage(img.name, img.src));
+
+        await Promise.all(promises);
+
+        // 如果主要图片都加载失败，则禁用图片模式
+        if (!this.images.hero && !this.images.enemy && !this.images.weapon) {
+            this.useImages = false;
+            console.log('图片加载失败，使用纯色占位模式');
+        }
+    }
+
+    getImage(name) {
+        return this.images[name] || null;
+    }
+
+    getProgress() {
+        return this.total > 0 ? (this.loaded / this.total) * 100 : 100;
+    }
+}
+
+// 全局资源加载器
+const Resources = new ResourceLoader();
+
 // ==================== 工具函数 ====================
 const Utils = {
     // 计算两点距离
@@ -252,25 +314,35 @@ class Player {
             ctx.globalAlpha = 0.5;
         }
 
-        // 主角身体
-        ctx.fillStyle = '#44ff44';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+        const heroImg = Resources.getImage('hero');
+        if (heroImg && Resources.useImages) {
+            // 使用图片绘制
+            const size = this.radius * 2;
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.drawImage(heroImg, -size / 2, -size / 2, size, size);
+            ctx.restore();
+        } else {
+            // 降级为纯色绘制
+            ctx.fillStyle = '#44ff44';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
 
-        // 眼睛
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(this.x - 7, this.y - 5, 3, 0, Math.PI * 2);
-        ctx.arc(this.x + 7, this.y - 5, 3, 0, Math.PI * 2);
-        ctx.fill();
+            // 眼睛
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(this.x - 7, this.y - 5, 3, 0, Math.PI * 2);
+            ctx.arc(this.x + 7, this.y - 5, 3, 0, Math.PI * 2);
+            ctx.fill();
 
-        // 嘴巴
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y + 3, 8, 0, Math.PI);
-        ctx.stroke();
+            // 嘴巴
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y + 3, 8, 0, Math.PI);
+            ctx.stroke();
+        }
 
         ctx.globalAlpha = 1.0;
 
@@ -281,34 +353,54 @@ class Player {
     drawWeapons(ctx) {
         const positions = this.getWeaponPositions();
         const color = this.weaponColors[this.weaponType % this.weaponColors.length];
+        const weaponImg = Resources.getImage('weapon');
+        const trailImg = Resources.getImage('trail');
 
         positions.forEach(pos => {
             // 拖尾效果
-            ctx.strokeStyle = color + '40';
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            const trailLength = 15;
-            ctx.moveTo(pos.x - Math.cos(pos.angle) * trailLength,
-                      pos.y - Math.sin(pos.angle) * trailLength);
-            ctx.lineTo(pos.x, pos.y);
-            ctx.stroke();
+            if (trailImg && Resources.useImages) {
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                ctx.translate(pos.x, pos.y);
+                ctx.rotate(pos.angle);
+                ctx.drawImage(trailImg, -30, -10, 30, 20);
+                ctx.restore();
+                ctx.globalAlpha = 1.0;
+            } else {
+                ctx.strokeStyle = color + '40';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                const trailLength = 15;
+                ctx.moveTo(pos.x - Math.cos(pos.angle) * trailLength,
+                          pos.y - Math.sin(pos.angle) * trailLength);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            }
 
             // 武器本体
             ctx.save();
             ctx.translate(pos.x, pos.y);
             ctx.rotate(pos.angle);
 
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.moveTo(10, 0);
-            ctx.lineTo(-5, -5);
-            ctx.lineTo(-5, 5);
-            ctx.closePath();
-            ctx.fill();
+            if (weaponImg && Resources.useImages) {
+                // 使用图片绘制武器（支持多种武器外观）
+                const weaponSize = 25;
+                const weaponY = this.weaponType * weaponSize; // 根据武器类型选择sprite sheet的不同部分
+                ctx.drawImage(weaponImg, 0, weaponY, weaponSize, weaponSize, -weaponSize/2, -weaponSize/2, weaponSize, weaponSize);
+            } else {
+                // 降级为纯色三角形
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(10, 0);
+                ctx.lineTo(-5, -5);
+                ctx.lineTo(-5, 5);
+                ctx.closePath();
+                ctx.fill();
 
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
 
             ctx.restore();
         });
@@ -393,39 +485,53 @@ class Enemy {
     draw(ctx) {
         if (this.isDead) return;
 
-        // 身体
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+        const enemyImg = Resources.getImage('enemy');
+        const size = this.radius * 2;
 
-        // 边框
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (enemyImg && Resources.useImages) {
+            // 使用图片绘制敌人（根据类型选择不同行）
+            const typeIndex = { 'minion': 0, 'elite': 1, 'boss': 2 };
+            const spriteY = typeIndex[this.type] * size;
 
-        // BOSS皇冠
-        if (this.type === 'boss') {
-            ctx.fillStyle = '#FFD700';
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.drawImage(enemyImg, 0, spriteY, size, size, -size / 2, -size / 2, size, size);
+            ctx.restore();
+        } else {
+            // 降级为纯色绘制
+            ctx.fillStyle = this.color;
             ctx.beginPath();
-            ctx.moveTo(this.x - 15, this.y - this.radius);
-            ctx.lineTo(this.x - 10, this.y - this.radius - 8);
-            ctx.lineTo(this.x - 5, this.y - this.radius - 2);
-            ctx.lineTo(this.x, this.y - this.radius - 10);
-            ctx.lineTo(this.x + 5, this.y - this.radius - 2);
-            ctx.lineTo(this.x + 10, this.y - this.radius - 8);
-            ctx.lineTo(this.x + 15, this.y - this.radius);
-            ctx.closePath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.fill();
+
+            // 边框
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // BOSS皇冠
+            if (this.type === 'boss') {
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.moveTo(this.x - 15, this.y - this.radius);
+                ctx.lineTo(this.x - 10, this.y - this.radius - 8);
+                ctx.lineTo(this.x - 5, this.y - this.radius - 2);
+                ctx.lineTo(this.x, this.y - this.radius - 10);
+                ctx.lineTo(this.x + 5, this.y - this.radius - 2);
+                ctx.lineTo(this.x + 10, this.y - this.radius - 8);
+                ctx.lineTo(this.x + 15, this.y - this.radius);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 精英头盔
+            if (this.type === 'elite') {
+                ctx.fillStyle = '#666';
+                ctx.fillRect(this.x - 12, this.y - this.radius - 5, 24, 8);
+            }
         }
 
-        // 精英头盔
-        if (this.type === 'elite') {
-            ctx.fillStyle = '#666';
-            ctx.fillRect(this.x - 12, this.y - this.radius - 5, 24, 8);
-        }
-
-        // 血条
+        // 血条（总是显示）
         if (this.hp < this.maxHp) {
             const barWidth = this.radius * 2;
             const barHeight = 4;
@@ -501,22 +607,35 @@ class ExpOrb {
     draw(ctx) {
         if (this.collected) return;
 
-        // 发光效果
-        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2);
-        gradient.addColorStop(0, '#ffff00');
-        gradient.addColorStop(0.5, '#ffaa00');
-        gradient.addColorStop(1, 'rgba(255, 170, 0, 0)');
+        const expOrbImg = Resources.getImage('exp_orb');
 
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
-        ctx.fill();
+        if (expOrbImg && Resources.useImages) {
+            // 使用图片绘制经验球
+            const size = this.radius * 4;
+            ctx.save();
+            ctx.globalAlpha = 0.8;
+            ctx.translate(this.x, this.y);
+            ctx.drawImage(expOrbImg, -size / 2, -size / 2, size, size);
+            ctx.restore();
+            ctx.globalAlpha = 1.0;
+        } else {
+            // 降级为渐变色绘制
+            const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2);
+            gradient.addColorStop(0, '#ffff00');
+            gradient.addColorStop(0.5, '#ffaa00');
+            gradient.addColorStop(1, 'rgba(255, 170, 0, 0)');
 
-        // 核心
-        ctx.fillStyle = '#ffff00';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 核心
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 }
 
@@ -560,7 +679,9 @@ class Chest {
     draw(ctx) {
         if (this.collected) return;
 
-        // 发光效果
+        const chestImg = Resources.getImage('chest');
+
+        // 发光效果（总是显示）
         const glowRadius = this.radius + Math.sin(this.glowPhase) * 5;
         const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowRadius);
         gradient.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
@@ -570,19 +691,29 @@ class Chest {
         ctx.arc(this.x, this.y, glowRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // 宝箱
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(this.x - this.radius * 0.6, this.y - this.radius * 0.4, this.radius * 1.2, this.radius * 0.8);
+        if (chestImg && Resources.useImages) {
+            // 使用图片绘制宝箱
+            const size = this.radius * 2;
+            const frame = this.isOpen ? 1 : 0; // 0=关闭, 1=打开
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.drawImage(chestImg, 0, frame * size, size, size, -size / 2, -size / 2, size, size);
+            ctx.restore();
+        } else {
+            // 降级为矩形绘制
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(this.x - this.radius * 0.6, this.y - this.radius * 0.4, this.radius * 1.2, this.radius * 0.8);
 
-        ctx.strokeStyle = '#8B4513';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(this.x - this.radius * 0.6, this.y - this.radius * 0.4, this.radius * 1.2, this.radius * 0.8);
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x - this.radius * 0.6, this.y - this.radius * 0.4, this.radius * 1.2, this.radius * 0.8);
 
-        // 锁
-        ctx.fillStyle = '#8B4513';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
-        ctx.fill();
+            // 锁
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 }
 
@@ -1122,19 +1253,26 @@ class Game {
 
     render() {
         const ctx = this.ctx;
+        const backgroundImg = Resources.getImage('background');
 
-        // 清空画布
-        ctx.fillStyle = '#7EC850';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        // 绘制背景
+        if (backgroundImg && Resources.useImages) {
+            // 使用背景图片
+            ctx.drawImage(backgroundImg, 0, 0, this.canvas.width, this.canvas.height);
+        } else {
+            // 降级为渐变色
+            ctx.fillStyle = '#7EC850';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
 
         // 绘制战场
         ctx.save();
         ctx.translate(this.centerX, this.centerY);
 
-        // 战场背景
+        // 战场背景（半透明圆形）
         const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.arenaRadius);
-        gradient.addColorStop(0, '#8ED960');
-        gradient.addColorStop(1, '#5AAB30');
+        gradient.addColorStop(0, 'rgba(142, 217, 96, 0.3)');
+        gradient.addColorStop(1, 'rgba(90, 171, 48, 0.5)');
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(0, 0, this.arenaRadius, 0, Math.PI * 2);
@@ -1194,6 +1332,72 @@ class Game {
 
 // 启动游戏
 let game;
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    // 显示加载界面
+    showLoadingScreen();
+
+    // 加载资源
+    await Resources.loadAll();
+
+    // 隐藏加载界面
+    hideLoadingScreen();
+
+    // 启动游戏
     game = new Game();
 });
+
+function showLoadingScreen() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 绘制加载背景
+    ctx.fillStyle = '#2C3E50';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制标题
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('鸠摩智转刀', canvas.width / 2, canvas.height / 2 - 50);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px Arial';
+    ctx.fillText('加载中...', canvas.width / 2, canvas.height / 2 + 20);
+
+    // 进度条动画
+    let progress = 0;
+    const loadingInterval = setInterval(() => {
+        progress = Resources.getProgress();
+
+        // 绘制进度条背景
+        ctx.fillStyle = '#2C3E50';
+        ctx.fillRect(0, canvas.height / 2 + 50, canvas.width, 30);
+
+        const barWidth = 400;
+        const barHeight = 20;
+        const barX = (canvas.width - barWidth) / 2;
+        const barY = canvas.height / 2 + 60;
+
+        // 进度条背景
+        ctx.fillStyle = '#34495e';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        // 进度条填充
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(barX, barY, barWidth * (progress / 100), barHeight);
+
+        // 进度文字
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Arial';
+        ctx.fillText(`${Math.floor(progress)}%`, canvas.width / 2, barY + barHeight + 25);
+
+        if (progress >= 100) {
+            clearInterval(loadingInterval);
+        }
+    }, 100);
+}
+
+function hideLoadingScreen() {
+    // 清空画布（会在Game.render中重绘）
+    console.log('资源加载完成！');
+}

@@ -57,12 +57,6 @@ class ResourceLoader {
     }
 }
 
-// 全局资源加载器
-const Resources = new ResourceLoader();
-
-// 全局音效管理器
-const Audio = new AudioManager();
-
 // ==================== 工具函数 ====================
 const Utils = {
     // 计算两点距离
@@ -183,6 +177,10 @@ class AudioManager {
         }
     }
 }
+
+// 全局实例
+const Resources = new ResourceLoader();
+const Audio = new AudioManager();
 
 // ==================== 玩家类 ====================
 class Player {
@@ -856,6 +854,11 @@ class Game {
 
         this.bossSpawned = false;
         this.bossAlive = false;
+
+        // 生成初始敌人，让游戏立即开始
+        for (let i = 0; i < 5; i++) {
+            this.spawnEnemy('minion');
+        }
 
         this.lastTime = performance.now();
         this.gameLoop();

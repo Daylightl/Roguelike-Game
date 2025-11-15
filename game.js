@@ -60,6 +60,9 @@ class ResourceLoader {
 // 全局资源加载器
 const Resources = new ResourceLoader();
 
+// 全局音效管理器
+const Audio = new AudioManager();
+
 // ==================== 工具函数 ====================
 const Utils = {
     // 计算两点距离
@@ -99,17 +102,42 @@ const Utils = {
 class AudioManager {
     constructor() {
         this.sounds = {};
-        this.enabled = false; // 默认关闭，避免加载失败
+        this.enabled = true; // 启用音效
+    }
+
+    async loadAll() {
+        const audioFiles = [
+            { name: 'bgm', src: 'assets/audio/bgm.mp3' },
+            { name: 'hit', src: 'assets/audio/hit.mp3' },
+            { name: 'levelup', src: 'assets/audio/levelup.mp3' },
+            { name: 'chest_open', src: 'assets/audio/chest_open.mp3' },
+            { name: 'boss_appear', src: 'assets/audio/boss_appear.mp3' },
+            { name: 'gameover', src: 'assets/audio/gameover.mp3' }
+        ];
+
+        const promises = audioFiles.map(file => this.load(file.name, file.src));
+        await Promise.all(promises);
     }
 
     load(name, src) {
-        try {
-            const audio = new Audio(src);
-            audio.volume = this.getVolume(name);
-            this.sounds[name] = audio;
-        } catch (e) {
-            console.warn(`Failed to load sound: ${name}`);
-        }
+        return new Promise((resolve) => {
+            try {
+                const audio = new Audio(src);
+                audio.volume = this.getVolume(name);
+                audio.oncanplaythrough = () => {
+                    this.sounds[name] = audio;
+                    resolve(true);
+                };
+                audio.onerror = () => {
+                    console.warn(`Failed to load sound: ${name}`);
+                    resolve(false);
+                };
+                audio.load();
+            } catch (e) {
+                console.warn(`Failed to load sound: ${name}`);
+                resolve(false);
+            }
+        });
     }
 
     getVolume(name) {
@@ -174,7 +202,7 @@ class Player {
         // 武器属性
         this.weaponCount = 2;
         this.weaponDamage = 10;
-        this.weaponRadius = 80;
+        this.weaponRadius = 45; // 修复：从80减小到45，避免空隙太大
         this.rotateSpeed = 120; // 度/秒
         this.currentAngle = 0;
 
@@ -199,7 +227,7 @@ class Player {
         this.weaponColors = ['#4488ff', '#ff4444', '#44ff44', '#ffaa00', '#ff44ff'];
     }
 
-    update(deltaTime, keys, arenaRadius) {
+    update(deltaTime, keys, arenaRadius, centerX, centerY) {
         // 移动处理
         this.vx = 0;
         this.vy = 0;
@@ -237,13 +265,16 @@ class Player {
         this.x += this.vx * effectiveSpeed * deltaTime;
         this.y += this.vy * effectiveSpeed * deltaTime;
 
-        // 圆形边界限制
-        const distFromCenter = Math.sqrt(this.x * this.x + this.y * this.y);
+        // 圆形边界限制 - 修复：相对于战场中心的距离
+        const dx = this.x - centerX;
+        const dy = this.y - centerY;
+        const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+
         if (distFromCenter + this.radius > arenaRadius) {
-            const angle = Math.atan2(this.y, this.x);
+            const angle = Math.atan2(dy, dx);
             const maxDist = arenaRadius - this.radius;
-            this.x = Math.cos(angle) * maxDist;
-            this.y = Math.sin(angle) * maxDist;
+            this.x = centerX + Math.cos(angle) * maxDist;
+            this.y = centerY + Math.sin(angle) * maxDist;
         }
 
         // 武器旋转
@@ -316,11 +347,25 @@ class Player {
 
         const heroImg = Resources.getImage('hero');
         if (heroImg && Resources.useImages) {
-            // 使用图片绘制
-            const size = this.radius * 2;
+            // 使用sprite图绘制 - 120×50px, 3帧横向排列，每帧40×50px
+            const frameWidth = 40;
+            const frameHeight = 50;
+            let frame = 0; // 默认待机帧
+
+            // 根据状态选择帧
+            if (this.invincible > 0) {
+                frame = 2; // 受伤帧
+            } else if (this.vx !== 0 || this.vy !== 0) {
+                frame = 1; // 移动帧
+            }
+
+            const srcX = frame * frameWidth;
+            const drawSize = this.radius * 2.5; // 稍微放大以匹配原比例
+
             ctx.save();
             ctx.translate(this.x, this.y);
-            ctx.drawImage(heroImg, -size / 2, -size / 2, size, size);
+            ctx.drawImage(heroImg, srcX, 0, frameWidth, frameHeight,
+                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             ctx.restore();
         } else {
             // 降级为纯色绘制
@@ -357,13 +402,13 @@ class Player {
         const trailImg = Resources.getImage('trail');
 
         positions.forEach(pos => {
-            // 拖尾效果
+            // 拖尾效果 - 50×5px
             if (trailImg && Resources.useImages) {
                 ctx.save();
                 ctx.globalAlpha = 0.5;
                 ctx.translate(pos.x, pos.y);
                 ctx.rotate(pos.angle);
-                ctx.drawImage(trailImg, -30, -10, 30, 20);
+                ctx.drawImage(trailImg, -50, -2.5, 50, 5);
                 ctx.restore();
                 ctx.globalAlpha = 1.0;
             } else {
@@ -383,10 +428,15 @@ class Player {
             ctx.rotate(pos.angle);
 
             if (weaponImg && Resources.useImages) {
-                // 使用图片绘制武器（支持多种武器外观）
-                const weaponSize = 25;
-                const weaponY = this.weaponType * weaponSize; // 根据武器类型选择sprite sheet的不同部分
-                ctx.drawImage(weaponImg, 0, weaponY, weaponSize, weaponSize, -weaponSize/2, -weaponSize/2, weaponSize, weaponSize);
+                // 使用sprite图绘制武器 - 150×50px, 横向5种，每个30×50px
+                const weaponWidth = 30;
+                const weaponHeight = 50;
+                const weaponIndex = this.weaponType % 5;
+                const srcX = weaponIndex * weaponWidth;
+
+                const drawSize = 25; // 绘制尺寸
+                ctx.drawImage(weaponImg, srcX, 0, weaponWidth, weaponHeight,
+                             -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             } else {
                 // 降级为纯色三角形
                 ctx.fillStyle = color;
@@ -486,16 +536,23 @@ class Enemy {
         if (this.isDead) return;
 
         const enemyImg = Resources.getImage('enemy');
-        const size = this.radius * 2;
 
         if (enemyImg && Resources.useImages) {
-            // 使用图片绘制敌人（根据类型选择不同行）
-            const typeIndex = { 'minion': 0, 'elite': 1, 'boss': 2 };
-            const spriteY = typeIndex[this.type] * size;
+            // 使用sprite图绘制敌人 - 100×360px, 纵向3个
+            // 小兵: 0-100px (100×100), 精英: 100-220px (100×120), BOSS: 220-360px (100×140)
+            const spriteInfo = {
+                'minion': { srcX: 0, srcY: 0, srcW: 100, srcH: 100 },
+                'elite': { srcX: 0, srcY: 100, srcW: 100, srcH: 120 },
+                'boss': { srcX: 0, srcY: 220, srcW: 100, srcH: 140 }
+            };
+
+            const sprite = spriteInfo[this.type];
+            const drawSize = this.radius * 2.2; // 绘制尺寸稍大于碰撞半径
 
             ctx.save();
             ctx.translate(this.x, this.y);
-            ctx.drawImage(enemyImg, 0, spriteY, size, size, -size / 2, -size / 2, size, size);
+            ctx.drawImage(enemyImg, sprite.srcX, sprite.srcY, sprite.srcW, sprite.srcH,
+                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             ctx.restore();
         } else {
             // 降级为纯色绘制
@@ -535,7 +592,7 @@ class Enemy {
         if (this.hp < this.maxHp) {
             const barWidth = this.radius * 2;
             const barHeight = 4;
-            const barY = this.y - this.radius - 10;
+            const barY = this.y - this.radius - 15; // 稍微抬高避免遮挡图片
 
             ctx.fillStyle = '#000';
             ctx.fillRect(this.x - barWidth / 2, barY, barWidth, barHeight);
@@ -692,12 +749,18 @@ class Chest {
         ctx.fill();
 
         if (chestImg && Resources.useImages) {
-            // 使用图片绘制宝箱
-            const size = this.radius * 2;
+            // 使用sprite图绘制宝箱 - 80×40px, 横向2帧，每帧40×40px
+            const frameWidth = 40;
+            const frameHeight = 40;
             const frame = this.isOpen ? 1 : 0; // 0=关闭, 1=打开
+            const srcX = frame * frameWidth;
+
+            const drawSize = this.radius * 2;
+
             ctx.save();
             ctx.translate(this.x, this.y);
-            ctx.drawImage(chestImg, 0, frame * size, size, size, -size / 2, -size / 2, size, size);
+            ctx.drawImage(chestImg, srcX, 0, frameWidth, frameHeight,
+                         -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             ctx.restore();
         } else {
             // 降级为矩形绘制
@@ -763,7 +826,7 @@ class Game {
         this.centerY = this.canvas.height / 2;
         this.arenaRadius = 500;
 
-        this.audio = new AudioManager();
+        this.audio = Audio; // 使用全局音效管理器
 
         this.keys = {};
         this.mousePressed = false;
@@ -872,7 +935,7 @@ class Game {
 
         // 更新玩家
         const forceAttract = this.keys[' '] || this.keys['space'];
-        this.player.update(deltaTime, this.keys, this.arenaRadius);
+        this.player.update(deltaTime, this.keys, this.arenaRadius, this.centerX, this.centerY);
 
         // 检查升级
         if (this.player.checkLevelUp()) {
@@ -1335,14 +1398,22 @@ window.addEventListener('load', async () => {
     // 显示加载界面
     showLoadingScreen();
 
-    // 加载资源
-    await Resources.loadAll();
+    // 并行加载图片和音效资源
+    await Promise.all([
+        Resources.loadAll(),
+        Audio.loadAll()
+    ]);
 
     // 隐藏加载界面
     hideLoadingScreen();
 
     // 启动游戏
     game = new Game();
+
+    // 播放背景音乐（需要用户交互才能播放）
+    document.addEventListener('click', () => {
+        Audio.playLoop('bgm');
+    }, { once: true });
 });
 
 function showLoadingScreen() {
